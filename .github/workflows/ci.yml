@@ -41,6 +41,13 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Create placeholder resource files for cargo check
+        shell: bash
+        run: |
+          mkdir -p resources
+          touch resources/sing-box.exe
+          touch resources/reefvpn-daemon.exe
+
       - name: Check daemon
         run: cargo check --manifest-path daemon/Cargo.toml
 
