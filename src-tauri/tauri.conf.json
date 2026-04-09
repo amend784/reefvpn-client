@@ -42,7 +42,7 @@
         "installMode": "perMachine"
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": false
   },
   "plugins": {
     "updater": {
