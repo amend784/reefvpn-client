@@ -22,7 +22,7 @@ export default function AccountSettings() {
   useEffect(() => {
     if (subscription !== null) return;
     api.getSubscription()
-      .then((s) => setSubscription(s))
+      .then((s: any) => setSubscription(s))
       .catch(() => {});
   }, []);
 

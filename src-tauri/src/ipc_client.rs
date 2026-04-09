@@ -1,6 +1,7 @@
 use crate::types::{ConnectParams, StatusResponse};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
+use std::time::Duration;
 
 #[derive(Serialize)]
 struct RpcRequest {
