@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+target/
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Resource binaries (downloaded at build time)
+resources/sing-box*
+resources/reefvpn-daemon*
+resources/*.dat
+resources/*.dll
+
+# Environment
+.env
+.env.production
+
+# IDE
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Tauri
+src-tauri/target/
+daemon/target/

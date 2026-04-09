@@ -1,0 +1,170 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Build daemon binary first ─────────────────────────────────────────
+  build-daemon:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: reefvpn-daemon.exe
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: reefvpn-daemon
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            artifact: reefvpn-daemon
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            artifact: reefvpn-daemon
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './daemon -> target'
+
+      - name: Build daemon
+        run: cargo build --release --manifest-path daemon/Cargo.toml --target ${{ matrix.target }}
+
+      - name: Upload daemon artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: daemon-${{ matrix.target }}
+          path: daemon/target/${{ matrix.target }}/release/${{ matrix.artifact }}
+
+  # ── Build Tauri app ───────────────────────────────────────────────────
+  build-tauri:
+    needs: build-daemon
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest
+            args: ''
+            daemon-target: x86_64-pc-windows-msvc
+            daemon-name: reefvpn-daemon.exe
+          - platform: ubuntu-22.04
+            args: ''
+            daemon-target: x86_64-unknown-linux-gnu
+            daemon-name: reefvpn-daemon
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+            daemon-target: x86_64-apple-darwin
+            daemon-name: reefvpn-daemon
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+            daemon-target: aarch64-apple-darwin
+            daemon-name: reefvpn-daemon
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Download daemon binary
+        uses: actions/download-artifact@v4
+        with:
+          name: daemon-${{ matrix.daemon-target }}
+          path: resources/
+
+      - name: Make daemon executable (Unix)
+        if: matrix.platform != 'windows-latest'
+        run: chmod +x resources/${{ matrix.daemon-name }}
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'ReefVPN v__VERSION__'
+          releaseBody: |
+            ## ReefVPN v__VERSION__
+
+            ### Downloads
+            - **Windows**: `.exe` installer (x64)
+            - **macOS**: `.dmg` disk image (Intel & Apple Silicon)
+            - **Linux**: `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage` (universal)
+
+            ### What's new
+            - 4 connection modes: Auto, Fast, Stable, Antiblock
+            - Smart fallback between protocols
+            - Kill switch & split tunneling
+            - Crypto payments
+
+            ---
+            [Full changelog](https://github.com/amend784/reefvpn-client/commits/v__VERSION__)
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+
+  # ── Generate checksums ────────────────────────────────────────────────
+  checksums:
+    needs: build-tauri
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all release assets
+        uses: robinraju/release-downloader@v1
+        with:
+          tag: ${{ github.ref_name }}
+          fileName: '*'
+          out-file-path: assets/
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload checksums
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: assets/SHA256SUMS.txt
