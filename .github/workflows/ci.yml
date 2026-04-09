@@ -39,7 +39,7 @@ jobs:
             ./daemon -> target
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Create placeholder resource files for cargo check
         shell: bash
