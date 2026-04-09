@@ -35,7 +35,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["../resources/sing-box.exe", "../resources/reefvpn-daemon.exe"],
+    "resources": ["../resources/*"],
     "windows": {
       "nsis": {
         "installerIcon": "icons/icon.ico",

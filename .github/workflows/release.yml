@@ -63,18 +63,26 @@ jobs:
             args: ''
             daemon-target: x86_64-pc-windows-msvc
             daemon-name: reefvpn-daemon.exe
+            singbox-url: https://github.com/SagerNet/sing-box/releases/download/v1.11.11/sing-box-1.11.11-windows-amd64.zip
+            singbox-ext: .exe
           - platform: ubuntu-22.04
             args: ''
             daemon-target: x86_64-unknown-linux-gnu
             daemon-name: reefvpn-daemon
+            singbox-url: https://github.com/SagerNet/sing-box/releases/download/v1.11.11/sing-box-1.11.11-linux-amd64.tar.gz
+            singbox-ext: ''
           - platform: macos-latest
             args: '--target x86_64-apple-darwin'
             daemon-target: x86_64-apple-darwin
             daemon-name: reefvpn-daemon
+            singbox-url: https://github.com/SagerNet/sing-box/releases/download/v1.11.11/sing-box-1.11.11-darwin-amd64.tar.gz
+            singbox-ext: ''
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
             daemon-target: aarch64-apple-darwin
             daemon-name: reefvpn-daemon
+            singbox-url: https://github.com/SagerNet/sing-box/releases/download/v1.11.11/sing-box-1.11.11-darwin-arm64.tar.gz
+            singbox-ext: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -107,12 +115,26 @@ jobs:
           name: daemon-${{ matrix.daemon-target }}
           path: resources/
 
-      - name: Make daemon executable (Unix)
+      - name: Download sing-box
+        shell: bash
+        run: |
+          mkdir -p /tmp/singbox
+          curl -L "${{ matrix.singbox-url }}" -o /tmp/singbox/archive
+          cd /tmp/singbox
+          if [[ "${{ matrix.singbox-url }}" == *.zip ]]; then
+            unzip archive
+          else
+            tar xzf archive
+          fi
+          find . -name "sing-box*" -type f ! -name "*.tar.gz" ! -name "*.zip" ! -name "archive" | head -1 | xargs -I{} cp {} $GITHUB_WORKSPACE/resources/sing-box${{ matrix.singbox-ext }}
+          ls -la $GITHUB_WORKSPACE/resources/
+
+      - name: Make binaries executable (Unix)
         if: matrix.platform != 'windows-latest'
-        run: chmod +x resources/${{ matrix.daemon-name }}
+        run: chmod +x resources/${{ matrix.daemon-name }} resources/sing-box*
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
